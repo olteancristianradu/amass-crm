@@ -1,0 +1,93 @@
+# =============================================================================
+# Docker Compose - Configuratie de DEVELOPMENT pentru Amass CRM
+# =============================================================================
+# Acest fisier contine DOAR serviciile de infrastructura necesare in development:
+#   - PostgreSQL (baza de date)
+#   - Redis (cache si mesagerie)
+#
+# DIFERENTA FATA DE PRODUCTIE (docker-compose.yml):
+#   - NU contine serviciul "api" - backend-ul se ruleaza local cu "pnpm dev"
+#     pentru hot-reload si debugging rapid
+#   - NU contine serviciul "web" - frontend-ul se ruleaza local cu "pnpm dev"
+#     (Vite dev server cu HMR pe portul 5173)
+#   - Redis NU are healthcheck - simplificare pentru development
+#   - NU exista Nginx - Vite dev server serveste direct frontend-ul
+#
+# Flux de lucru in development:
+#   1. Porniti infrastructura: docker compose -f docker-compose.dev.yml up -d
+#   2. Porniti API-ul local:   cd apps/api && pnpm dev
+#   3. Porniti frontend-ul:    cd apps/web && pnpm dev
+#   4. Accesati aplicatia la:  http://localhost:5173
+#
+# Avantaje fata de productie:
+#   - Hot-reload instant la modificarea codului (fara rebuild Docker)
+#   - Debugging cu breakpoints in IDE (VS Code, WebStorm)
+#   - Mesaje de eroare detaliate (NODE_ENV=development)
+#   - Source maps pentru depanare frontend
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # POSTGRES - Baza de date (identica cu productia)
+  # ---------------------------------------------------------------------------
+  # Configuratie identica cu cea din docker-compose.yml.
+  # Acelasi volum "pgdata" asigura persistenta datelor intre restartari.
+  # Portul 5432 este expus pentru a permite conectarea directa din API-ul local
+  # si din unelte precum pgAdmin, DBeaver sau Prisma Studio.
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      # Aceleasi credentiale ca in productie - API-ul local se conecteaza cu acestea.
+      # DATABASE_URL in .env-ul API-ului trebuie sa fie:
+      # postgresql://amass:amass_secret@localhost:5432/amass_crm
+      # (foloseste "localhost" in loc de "postgres" deoarece API-ul ruleaza pe host)
+      POSTGRES_USER: amass
+      POSTGRES_PASSWORD: amass_secret
+      POSTGRES_DB: amass_crm
+    ports:
+      # Portul este ESENTIAL in development - API-ul ruleaza pe masina gazda
+      # si trebuie sa acceseze PostgreSQL prin localhost:5432
+      - "5432:5432"
+    volumes:
+      # Acelasi volum "pgdata" - datele persista intre sesiunile de development
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Healthcheck-ul e util si in development pentru a verifica starea bazei de date.
+      # Puteti rula: docker compose -f docker-compose.dev.yml ps
+      # pentru a vedea statusul.
+      test: ["CMD-SHELL", "pg_isready -U amass -d amass_crm"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # REDIS - Cache si broker de mesaje (simplificat fata de productie)
+  # ---------------------------------------------------------------------------
+  # Redis este necesar si in development pentru:
+  #   - Functionalitatile WebSocket (Socket.IO adapter)
+  #   - Testarea cache-ului si rate limiting-ului
+  #
+  # NOTA: In development, Redis NU are healthcheck configurat.
+  # Acest lucru simplifica pornirea - nu trebuie sa asteptam ca Redis
+  # sa fie "healthy" inainte de a porni API-ul (oricum il pornim manual).
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    ports:
+      # Portul este ESENTIAL in development - API-ul local se conecteaza
+      # la Redis prin localhost:6379. REDIS_URL in .env: redis://localhost:6379
+      - "6379:6379"
+
+# =============================================================================
+# VOLUME - Stocare persistenta (partajat cu configuratia de productie)
+# =============================================================================
+# IMPORTANT: Daca rulati ambele configuratii pe aceeasi masina, ele vor
+# partaja acelasi volum "pgdata". Aceasta inseamna ca datele create in
+# development vor fi vizibile in productie si invers.
+# Pentru a evita acest lucru, folositi un prefix de proiect diferit:
+#   docker compose -f docker-compose.dev.yml -p amass-dev up -d
+# =============================================================================
+volumes:
+  pgdata:

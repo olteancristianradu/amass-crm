@@ -1,0 +1,53 @@
+name: Deploy Production
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Build Docker images
+        run: |
+          docker build -f apps/api/Dockerfile -t amass-api:${{ steps.version.outputs.VERSION }} .
+          docker build -f apps/web/Dockerfile -t amass-web:${{ steps.version.outputs.VERSION }} .
+
+      # Uncomment and configure when container registry is set up:
+      # - name: Push to registry
+      #   run: |
+      #     docker tag amass-api:${{ steps.version.outputs.VERSION }} ${{ vars.REGISTRY }}/amass-api:${{ steps.version.outputs.VERSION }}
+      #     docker tag amass-web:${{ steps.version.outputs.VERSION }} ${{ vars.REGISTRY }}/amass-web:${{ steps.version.outputs.VERSION }}
+      #     docker push ${{ vars.REGISTRY }}/amass-api:${{ steps.version.outputs.VERSION }}
+      #     docker push ${{ vars.REGISTRY }}/amass-web:${{ steps.version.outputs.VERSION }}
+
+      # - name: Deploy to production cluster
+      #   run: |
+      #     kubectl set image deployment/api api=${{ vars.REGISTRY }}/amass-api:${{ steps.version.outputs.VERSION }}
+      #     kubectl set image deployment/web web=${{ vars.REGISTRY }}/amass-web:${{ steps.version.outputs.VERSION }}

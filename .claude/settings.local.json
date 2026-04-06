@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm run:*)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Bash(find /Users/cristian-radu/Documents/amass-crm/apps/api/src/modules -name \"*.schema.ts\" -type f -exec wc -l {} +)"
+    ]
+  }
+}

@@ -1,0 +1,166 @@
+# =============================================================================
+# Docker Compose - Configuratie de PRODUCTIE pentru Amass CRM
+# =============================================================================
+# Acest fisier defineste intreaga infrastructura necesara pentru rularea
+# aplicatiei CRM in modul productie. Contine 4 servicii:
+#   1. postgres  - baza de date relationala (stocare persistenta)
+#   2. redis     - cache in-memory si broker de mesaje
+#   3. api       - backend-ul NestJS/Express (REST API + WebSocket)
+#   4. web       - frontend-ul React servit prin Nginx
+#
+# Pornire: docker compose up -d
+# Oprire:  docker compose down
+# Rebuild: docker compose up -d --build
+# Logs:    docker compose logs -f [serviciu]
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # POSTGRES - Baza de date principala
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 16 pe Alpine Linux (imagine mica, ~80MB).
+  # Stocheaza toate datele CRM: clienti, utilizatori, apeluri, activitati etc.
+  # Datele persista intre restartari datorita volumului "pgdata" montat mai jos.
+  # ---------------------------------------------------------------------------
+  postgres:
+    # Imaginea oficiala PostgreSQL 16 pe Alpine - varianta lightweight
+    image: postgres:16-alpine
+    environment:
+      # Numele utilizatorului bazei de date. Modificati in productie reala.
+      POSTGRES_USER: amass
+      # Parola utilizatorului. IMPORTANT: schimbati aceasta valoare in productie
+      # si folositi un secret manager (Docker Secrets, Vault, etc.)
+      POSTGRES_PASSWORD: amass_secret
+      # Numele bazei de date care va fi creata automat la primul start
+      POSTGRES_DB: amass_crm
+    ports:
+      # Mapare port: host:container. Permite conectarea de pe masina gazda
+      # cu un client SQL (pgAdmin, DBeaver) la localhost:5432.
+      # In productie, eliminati acest port pentru securitate.
+      - "5432:5432"
+    volumes:
+      # Volumul Docker numit "pgdata" asigura persistenta datelor.
+      # Fara acesta, datele s-ar pierde la fiecare restart al containerului.
+      # Calea din container /var/lib/postgresql/data este locatia default PostgreSQL.
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Verificare periodica a starii bazei de date folosind pg_isready.
+      # Alte servicii (api) asteapta ca postgres sa fie "healthy" inainte de pornire.
+      test: ["CMD-SHELL", "pg_isready -U amass -d amass_crm"]
+      # Intervalul dintre verificari consecutive
+      interval: 5s
+      # Timp maxim de asteptare pentru o verificare individuala
+      timeout: 5s
+      # Numarul de incercari esuate consecutive inainte de a marca serviciul ca "unhealthy"
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # REDIS - Cache si broker de mesaje in-memory
+  # ---------------------------------------------------------------------------
+  # Redis 7 pe Alpine Linux. Folosit pentru:
+  #   - Stocarea sesiunilor si token-urilor de refresh
+  #   - Cache pentru date frecvent accesate (reducerea incarcarii DB)
+  #   - Broker pentru comunicatii WebSocket in timp real (Socket.IO adapter)
+  #   - Rate limiting la nivel de API
+  # Redis nu are persistenta configurata aici - datele din cache se pierd
+  # la restart, ceea ce este acceptabil pentru un cache layer.
+  # ---------------------------------------------------------------------------
+  redis:
+    # Imaginea oficiala Redis 7 pe Alpine - varianta lightweight
+    image: redis:7-alpine
+    ports:
+      # Mapare port: permite accesul de pe masina gazda cu redis-cli.
+      # In productie, eliminati acest port si lasati doar comunicarea interna Docker.
+      - "6379:6379"
+    healthcheck:
+      # Verificare periodica: comanda "ping" trebuie sa returneze "PONG"
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # API - Backend-ul aplicatiei (NestJS / Express + Prisma)
+  # ---------------------------------------------------------------------------
+  # Construieste si ruleaza backend-ul CRM din Dockerfile-ul dedicat.
+  # La pornire, ruleaza automat migrarile Prisma, apoi porneste serverul Node.js.
+  # Expune REST API pe portul 3000 si gestioneaza conexiunile WebSocket.
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      # Contextul de build este radacina proiectului (monorepo).
+      # Acest lucru e necesar pentru ca Dockerfile-ul are nevoie de
+      # package.json, pnpm-workspace.yaml si pachetul shared din radacina.
+      context: .
+      # Calea catre Dockerfile-ul API-ului relativ la context
+      dockerfile: apps/api/Dockerfile
+    ports:
+      # API-ul asculta pe portul 3000. Accesibil direct la http://localhost:3000.
+      # In productie cu Nginx in fata, acest port poate fi eliminat din expunere
+      # si accesat doar prin reteaua interna Docker.
+      - "3000:3000"
+    environment:
+      # URL-ul de conectare la PostgreSQL. Formatul: postgresql://user:password@host:port/db
+      # "postgres" este numele serviciului Docker (rezolvat automat prin DNS-ul Docker)
+      DATABASE_URL: postgresql://amass:amass_secret@postgres:5432/amass_crm
+      # Cheia secreta pentru semnarea token-urilor JWT de acces (access tokens).
+      # IMPORTANT: in productie, inlocuiti cu un string random de minim 64 caractere.
+      # Generare: openssl rand -base64 64
+      JWT_SECRET: change-me-in-production-64-char-random-string-here
+      # Cheia secreta separata pentru token-urile JWT de refresh.
+      # Trebuie sa fie diferita de JWT_SECRET pentru securitate suplimentara.
+      JWT_REFRESH_SECRET: change-me-another-64-char-random-string-here
+      # Originea permisa pentru CORS (Cross-Origin Resource Sharing).
+      # Frontend-ul Vite ruleaza pe portul 5173 in development.
+      # In productie, setati la domeniul real (ex: https://crm.amass.ro)
+      CORS_ORIGIN: http://localhost:5173
+      # URL-ul de conectare la Redis. "redis" este numele serviciului Docker.
+      REDIS_URL: redis://redis:6379
+      # Modul de rulare Node.js - "production" activeaza optimizari
+      NODE_ENV: production
+      # Portul pe care asculta API-ul in interiorul containerului
+      API_PORT: 3000
+    depends_on:
+      # API-ul porneste DOAR dupa ce postgres si redis sunt sanatoase (healthy).
+      # Aceasta previne erorile de conectare la startup.
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # WEB - Frontend-ul React servit prin Nginx
+  # ---------------------------------------------------------------------------
+  # Construieste aplicatia React cu Vite si o serveste ca fisiere statice
+  # printr-un server Nginx. Nginx actioneaza si ca reverse proxy, rutand
+  # cererile /api/ si /socket.io/ catre backend-ul API.
+  # Acesta este punctul principal de intrare pentru utilizatori (portul 80).
+  # ---------------------------------------------------------------------------
+  web:
+    build:
+      # Contextul de build este radacina proiectului (monorepo) deoarece
+      # Dockerfile-ul are nevoie de fisierele din radacina si de nginx.conf din infra/
+      context: .
+      # Calea catre Dockerfile-ul frontend-ului relativ la context
+      dockerfile: apps/web/Dockerfile
+    ports:
+      # Portul 80 pe masina gazda - acesta este portul standard HTTP.
+      # Utilizatorii acceseaza aplicatia la http://localhost (sau http://domeniu.ro)
+      - "80:80"
+    depends_on:
+      # Frontend-ul depinde de API pentru ca Nginx face proxy catre acesta.
+      # Daca API-ul nu e pornit, cererile /api/ vor esua cu 502 Bad Gateway.
+      - api
+
+# =============================================================================
+# VOLUME - Stocare persistenta
+# =============================================================================
+# Volumele Docker sunt gestionate de Docker Engine si persista independent
+# de ciclul de viata al containerelor. Datele nu se pierd la docker compose down.
+# Pentru stergerea completa a datelor: docker compose down -v
+# =============================================================================
+volumes:
+  # Volumul pentru datele PostgreSQL. Contine toate tabelele, indexurile si datele CRM.
+  # ATENTIE: "docker compose down -v" va sterge ireversibil acest volum si toate datele!
+  pgdata:

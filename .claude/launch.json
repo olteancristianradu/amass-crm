@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "/usr/bin/env",
+      "runtimeArgs": [
+        "PATH=/opt/homebrew/bin:/usr/bin:/bin",
+        "node",
+        "/Users/cristian-radu/Documents/amass-crm/node_modules/.pnpm/vite@6.4.1_@types+node@22.19.15_jiti@2.6.1_terser@5.46.1_tsx@4.21.0/node_modules/vite/bin/vite.js",
+        "--port", "5173"
+      ],
+      "port": 5173,
+      "cwd": "/Users/cristian-radu/Documents/amass-crm/apps/web"
+    }
+  ]
+}

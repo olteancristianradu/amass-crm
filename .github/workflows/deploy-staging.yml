@@ -1,0 +1,48 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test
+
+      - name: Build Docker images
+        run: |
+          docker build -f apps/api/Dockerfile -t amass-api:staging .
+          docker build -f apps/web/Dockerfile -t amass-web:staging .
+
+      # Uncomment and configure when container registry is set up:
+      # - name: Push to registry
+      #   run: |
+      #     docker tag amass-api:staging ${{ vars.REGISTRY }}/amass-api:staging
+      #     docker tag amass-web:staging ${{ vars.REGISTRY }}/amass-web:staging
+      #     docker push ${{ vars.REGISTRY }}/amass-api:staging
+      #     docker push ${{ vars.REGISTRY }}/amass-web:staging
+
+      # - name: Deploy to staging cluster
+      #   run: |
+      #     kubectl set image deployment/api api=${{ vars.REGISTRY }}/amass-api:staging
+      #     kubectl set image deployment/web web=${{ vars.REGISTRY }}/amass-web:staging
