@@ -6,8 +6,25 @@ import { initSocket } from './socket';
 import { initEventSubscribers } from './events/subscribers';
 import { initSentry } from './config/sentry';
 import logger from './config/logger';
+import { validateStartup } from './config/startup';
 
 async function main() {
+  // Validate startup configuration
+  const validation = validateStartup();
+  if (!validation.ok) {
+    console.error('\n[Startup] VALIDATION FAILED - Cannot start application:\n');
+    validation.errors.forEach((error) => console.error(`  ❌ ${error}`));
+    console.error('');
+    process.exit(1);
+  }
+
+  // Log warnings if any
+  if (validation.warnings.length > 0) {
+    console.warn('\n[Startup] WARNINGS:\n');
+    validation.warnings.forEach((warning) => console.warn(`  ⚠️  ${warning}`));
+    console.warn('');
+  }
+
   // Initialize Sentry (must be before other initializations)
   initSentry();
 

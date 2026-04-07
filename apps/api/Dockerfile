@@ -105,6 +105,11 @@ COPY --from=builder /app/packages ./packages
 # Schema Prisma si migrarile sunt necesare pentru "prisma migrate deploy" la startup.
 COPY --from=builder /app/apps/api ./apps/api
 
+# Copiaza startup script din radacina proiectului (din build context).
+# Scriptul valideaza environment variables si ruleaza migratiile.
+COPY apps/api/startup.sh /app/startup.sh
+RUN chmod +x /app/startup.sh
+
 # Schimba directorul de lucru la API pentru comenzile de rulare.
 # Prisma cauta schema.prisma relativ la directorul curent.
 WORKDIR /app/apps/api
@@ -116,11 +121,8 @@ EXPOSE 3000
 
 # Comanda de pornire a containerului.
 # Executata in ordine:
-#   1. "npx prisma migrate deploy" - aplica toate migrarile Prisma in asteptare
-#      pe baza de date. Aceasta asigura ca schema DB este sincronizata cu codul.
-#      Spre deosebire de "prisma migrate dev", "deploy" nu creeaza migratii noi,
-#      ci doar le aplica pe cele existente (sigur pentru productie).
-#   2. "node dist/index.js" - porneste serverul API compilat.
-#      dist/index.js este punctul de intrare al aplicatiei compilate din TypeScript.
-# Folosim "sh -c" pentru a putea lansa ambele comenzi secvential (&& intre ele).
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+#   1. /app/startup.sh - valideaza DATABASE_URL si ruleaza migratiile Prisma
+#   2. node dist/index.js - porneste serverul API compilat
+# Scriptul startup.sh are logica pentru a gestiona graceful cazurile in care
+# DATABASE_URL lipseste sau este malformat, oferind mesaje de eroare clare.
+CMD ["/app/startup.sh"]
