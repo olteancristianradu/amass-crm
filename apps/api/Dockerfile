@@ -57,6 +57,14 @@ RUN pnpm install --frozen-lockfile || pnpm install
 COPY packages/shared packages/shared
 COPY apps/api apps/api
 
+# Compileaza pachetul shared INAINTE de api.
+# @amass/api importa @amass/shared (workspace dep). Build-ul produce DOUA output-uri:
+#   - dist/cjs/ (CommonJS) — folosit de api la runtime via require()
+#   - dist/esm/ (ESM)      — folosit de Vite la build-ul web
+# Fara acest pas, api esueaza atat la build (tsc nu rezolva @amass/shared) cat si
+# la runtime (require gaseste main: dist/cjs/index.js care nu exista).
+RUN pnpm --filter @amass/shared build
+
 # Genereaza clientul Prisma din schema.prisma.
 # Prisma Client este o librarie generata automat care ofera acces type-safe
 # la baza de date. Fara acest pas, API-ul nu poate interactiona cu PostgreSQL.

@@ -50,6 +50,12 @@ RUN pnpm install --frozen-lockfile || pnpm install
 COPY packages/shared packages/shared
 COPY apps/web apps/web
 
+# Compileaza pachetul shared INAINTE de web.
+# Build-ul produce dist/cjs si dist/esm. Vite rezolva @amass/shared prin campul
+# "module"/"exports.import" din package.json, care pointeaza la dist/esm/index.js.
+# Fara acest pas, vite build esueaza cu "module not found".
+RUN pnpm --filter @amass/shared build
+
 # Construieste aplicatia React pentru productie folosind Vite.
 # Vite (bundler modern) proceseaza:
 #   - Transpilare JSX/TSX -> JavaScript
