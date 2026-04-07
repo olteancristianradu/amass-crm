@@ -70,6 +70,20 @@ function validateJwtSecrets(): { issues: string[] } {
 }
 
 /**
+ * Validates that API_PORT is a valid number and within reasonable range.
+ */
+function validatePort(): { ok: boolean; message?: string } {
+  const port = env.API_PORT;
+  if (port < 1 || port > 65535 || isNaN(port)) {
+    return {
+      ok: false,
+      message: `API_PORT must be a valid port number (1-65535). Current value: ${port}`,
+    };
+  }
+  return { ok: true };
+}
+
+/**
  * Validates optional integrations but only warns if missing (doesn't block startup).
  * These are features that gracefully degrade if not configured.
  */
@@ -97,6 +111,18 @@ function validateOptionalIntegrations(): { warnings: string[] } {
     if (!env.STRIPE_SECRET_KEY) {
       warnings.push('Stripe not configured - billing features will not work.');
     }
+
+    if (!env.OPENAI_API_KEY) {
+      warnings.push('OpenAI not configured - AI features (transcription, summarization) will not work.');
+    }
+
+    if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS) {
+      warnings.push('SMTP not configured - scheduled report delivery will not work.');
+    }
+
+    if (!process.env.SENTRY_DSN) {
+      warnings.push('Sentry not configured - error tracking and monitoring will not work.');
+    }
   }
 
   return { warnings };
@@ -120,6 +146,13 @@ export function validateStartup(): ValidationResult {
     console.log('[Startup] ✓ DATABASE_URL is configured');
   }
 
+  const portValidation = validatePort();
+  if (!portValidation.ok) {
+    errors.push(portValidation.message || 'API_PORT validation failed');
+  } else {
+    console.log(`[Startup] ✓ API port (${env.API_PORT}) is valid`);
+  }
+
   // JWT secret warnings in production
   const jwtIssues = validateJwtSecrets();
   if (jwtIssues.issues.length > 0) {
@@ -133,7 +166,6 @@ export function validateStartup(): ValidationResult {
   }
 
   console.log(`[Startup] Node environment: ${env.NODE_ENV}`);
-  console.log(`[Startup] API port: ${env.API_PORT}`);
 
   return {
     ok: errors.length === 0,
