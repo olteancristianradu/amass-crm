@@ -34,7 +34,8 @@ WORKDIR /app
 # - package.json: dependentele root ale monorepo-ului
 # - pnpm-workspace.yaml: configuratia workspace-urilor pnpm (defineste packages/ si apps/)
 # - pnpm-lock.yaml*: lockfile-ul exact al dependentelor (* = optional, poate lipsi)
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
+# - tsconfig.base.json: configuratia TypeScript bazata pentru toate pachetele
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* tsconfig.base.json ./
 
 # Copiaza package.json-urile individuale ale pachetelor necesare.
 # pnpm are nevoie de aceste fisiere pentru a rezolva dependentele interne
