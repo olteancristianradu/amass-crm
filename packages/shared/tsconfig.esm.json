@@ -6,7 +6,8 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "declaration": false,
-    "declarationMap": false
+    "declarationMap": false,
+    "skipLibCheck": true
   },
   "include": ["src/**/*"]
 }
