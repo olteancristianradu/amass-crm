@@ -49,17 +49,28 @@ AAmassCharacter::AAmassCharacter()
 void AAmassCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	ApplyDefaultMappingContext();
+}
 
-	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+void AAmassCharacter::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+	ApplyDefaultMappingContext();
+}
+
+void AAmassCharacter::ApplyDefaultMappingContext()
+{
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC || !DefaultMappingContext)
 	{
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
-			ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
-		{
-			if (DefaultMappingContext)
-			{
-				Subsystem->AddMappingContext(DefaultMappingContext, 0);
-			}
-		}
+		return;
+	}
+
+	if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
+		ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
+	{
+		Subsystem->RemoveMappingContext(DefaultMappingContext);
+		Subsystem->AddMappingContext(DefaultMappingContext, 0);
 	}
 }
 
@@ -180,6 +191,7 @@ void AAmassCharacter::TryEnterVehicle()
 	}
 
 	CurrentVehicle = Vehicle;
+	Vehicle->SetDriver(this);
 	SetActorHiddenInGame(true);
 	SetActorEnableCollision(false);
 	GetCharacterMovement()->DisableMovement();
@@ -203,6 +215,7 @@ void AAmassCharacter::ExitVehicle()
 	SetActorEnableCollision(true);
 	GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 
+	CurrentVehicle->SetDriver(nullptr);
 	if (PC)
 	{
 		PC->Possess(this);

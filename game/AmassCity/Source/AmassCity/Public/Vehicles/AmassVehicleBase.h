@@ -5,6 +5,7 @@
 #include "InputActionValue.h"
 #include "AmassVehicleBase.generated.h"
 
+class AAmassCharacter;
 class UInputAction;
 class UInputMappingContext;
 class UCameraComponent;
@@ -24,6 +25,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Amass|Vehicle")
 	float GetSpeedKmh() const;
+
+	void SetDriver(AAmassCharacter* InDriver) { Driver = InDriver; }
+	AAmassCharacter* GetDriver() const { return Driver.Get(); }
 
 protected:
 	virtual void BeginPlay() override;
@@ -62,4 +66,7 @@ protected:
 	void HandbrakeReleased();
 	void Look(const FInputActionValue& Value);
 	void ExitVehicle();
+
+private:
+	TWeakObjectPtr<AAmassCharacter> Driver;
 };

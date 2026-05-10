@@ -23,6 +23,7 @@ public:
 
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+	virtual void PossessedBy(AController* NewController) override;
 
 	UFUNCTION(BlueprintCallable, Category = "Amass|Vehicle")
 	void TryEnterVehicle();
@@ -93,4 +94,5 @@ private:
 	TObjectPtr<AAmassVehicleBase> CurrentVehicle;
 
 	AAmassVehicleBase* FindNearestVehicle() const;
+	void ApplyDefaultMappingContext();
 };

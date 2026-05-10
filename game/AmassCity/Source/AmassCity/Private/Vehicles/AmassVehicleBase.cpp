@@ -2,7 +2,6 @@
 
 #include "Camera/CameraComponent.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
-#include "EngineUtils.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/PlayerController.h"
@@ -139,19 +138,8 @@ void AAmassVehicleBase::Look(const FInputActionValue& Value)
 
 void AAmassVehicleBase::ExitVehicle()
 {
-	APlayerController* PC = Cast<APlayerController>(GetController());
-	if (!PC)
+	if (AAmassCharacter* DriverPtr = Driver.Get())
 	{
-		return;
-	}
-
-	for (TActorIterator<AAmassCharacter> It(GetWorld()); It; ++It)
-	{
-		AAmassCharacter* Driver = *It;
-		if (Driver && Driver->IsInVehicle())
-		{
-			Driver->ExitVehicle();
-			return;
-		}
+		DriverPtr->ExitVehicle();
 	}
 }
