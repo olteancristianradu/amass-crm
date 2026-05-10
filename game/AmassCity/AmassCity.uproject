@@ -1,0 +1,34 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "5.4",
+	"Category": "Open World",
+	"Description": "Amass City - open-world action game (original IP, GTA-genre inspired)",
+	"Modules": [
+		{
+			"Name": "AmassCity",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"AdditionalDependencies": [
+				"Engine",
+				"CoreUObject",
+				"EnhancedInput",
+				"ChaosVehicles",
+				"GameplayAbilities",
+				"GameplayTags",
+				"GameplayTasks",
+				"AIModule",
+				"NavigationSystem",
+				"UMG"
+			]
+		}
+	],
+	"Plugins": [
+		{ "Name": "EnhancedInput", "Enabled": true },
+		{ "Name": "ChaosVehiclesPlugin", "Enabled": true },
+		{ "Name": "GameplayAbilities", "Enabled": true },
+		{ "Name": "ModelingToolsEditorMode", "Enabled": true },
+		{ "Name": "Water", "Enabled": true },
+		{ "Name": "Landmass", "Enabled": true },
+		{ "Name": "PCG", "Enabled": true }
+	]
+}
